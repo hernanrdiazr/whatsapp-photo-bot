@@ -13,7 +13,7 @@ const port = 80;
 
 // Webhook route for pix payment
 app.use(express.json());
-app.get('/', async (req: any, res: any) => {
+app.post('/', async (req: any, res: any) => {
   return res.status(200).json(req.body);
 });
 
