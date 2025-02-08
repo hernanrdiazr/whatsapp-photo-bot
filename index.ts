@@ -4,9 +4,23 @@ import * as fs from 'fs';
 import AWS from 'aws-sdk';
 import dotenv from 'dotenv';
 const { google } = require('googleapis');
-
+import express from 'express';
 // Load environment variables from .env file
 dotenv.config();
+
+const app = express();
+const port = 80;
+
+// Webhook route for pix payment
+app.use(express.json());
+app.get('/', async (req, res) => {
+  return res.status(200).json(req.body);
+});
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+
 
 // Google Drive setup with Service Account
 const SCOPES = ['https://www.googleapis.com/auth/drive'];
@@ -16,6 +30,11 @@ const auth = new google.auth.GoogleAuth({
   keyFile: CREDENTIALS_FILE,
   scopes: SCOPES,
 });
+
+setInterval(() => {
+    const memoryUsage = process.memoryUsage();
+    console.log(`Memory usage: RSS: ${memoryUsage.rss / 1024 / 1024} MB, Heap Total: ${memoryUsage.heapTotal / 1024 / 1024} MB, Heap Used: ${memoryUsage.heapUsed / 1024 / 1024} MB`);
+  }, 5000); // Logs memory usage every 5 seconds
 
 const drive = google.drive({ version: 'v3', auth });
 
