@@ -1,0 +1,127 @@
+import makeWASocket, { DisconnectReason, useMultiFileAuthState, makeInMemoryStore } from '@whiskeysockets/baileys';
+import { Boom } from '@hapi/boom';
+import * as fs from 'fs';
+const { google } = require('googleapis');
+
+// Google Drive setup with Service Account
+const SCOPES = ['https://www.googleapis.com/auth/drive'];
+const CREDENTIALS_FILE = 'google_drive_api_credentials.json'; // Your service account JSON file
+
+const auth = new google.auth.GoogleAuth({
+  keyFile: CREDENTIALS_FILE,
+  scopes: SCOPES,
+});
+
+const drive = google.drive({ version: 'v3', auth });
+
+// Function to fetch photos from Google Drive by folder ID
+async function getPhotosFromDrive(folderId: string) {
+    try {
+        // Fetch photos from the folder
+        const res = await drive.files.list({
+            q: `'${folderId}' in parents and mimeType contains 'image/'`,
+            fields: 'files(id, name)',
+        });
+
+        // Extract the URLs from the response
+        const photoUrls = res.data.files.map((file: any) => `https://drive.google.com/uc?id=${file.id}`);
+
+        console.log('Photos fetched:', photoUrls);
+
+        return photoUrls;
+
+    } catch (error) {
+        if (error instanceof Error) {
+            console.error('Error fetching photos from Google Drive:', error.message);
+        } else {
+            console.error('Error fetching photos from Google Drive:', error);
+        }
+        return [];
+    }
+}
+
+async function connectToWhatsApp() {
+    // Use multi-file auth state to persist session
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
+
+    // Initialize in-memory store for message data
+    const store = makeInMemoryStore({});
+    store.readFromFile('./baileys_store.json');
+
+    // Save the store state periodically
+    setInterval(() => {
+        store.writeToFile('./baileys_store.json');
+    }, 10_000);
+
+    // Create a new socket connection
+    const sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true,
+        browser: ['MyApp', 'Chrome', '1.0'], // Custom browser info
+        syncFullHistory: true, // Fetch complete history
+    });
+
+    // Save credentials when updated
+    sock.ev.on('creds.update', saveCreds);
+
+    // Handle connection updates
+    sock.ev.on('connection.update', (update) => {
+        const { connection, lastDisconnect } = update;
+        if (connection === 'close') {
+            const reason = (lastDisconnect?.error as Boom)?.output?.statusCode;
+            const shouldReconnect = reason !== DisconnectReason.loggedOut;
+
+            console.log('Connection closed:', reason, '. Reconnecting:', shouldReconnect);
+            if (shouldReconnect) {
+                connectToWhatsApp();
+            }
+        } else if (connection === 'open') {
+            console.log('Connection opened successfully!');
+        }
+    });
+
+    sock.ev.on('messages.upsert', async (m) => {
+        const message = m.messages[0];
+        if (!message.message || message.key.fromMe) return;
+    
+        const sender = message.key.remoteJid;
+        const text = message.message.conversation || message.message.extendedTextMessage?.text;
+    
+        console.log(`Received message from ${sender}: ${text}`);
+    
+        const folderIdMatch = text?.match(/fid=([\w-]+)/);
+        const folderId = folderIdMatch ? folderIdMatch[1] : '';
+    
+        if (!folderId) {
+            await sock.sendMessage(sender ?? '', { text: 'No valid folder ID found in the message.' });
+            return;
+        }
+    
+        const photos = await getPhotosFromDrive(folderId);
+    
+        if (photos.length === 0) {
+            await sock.sendMessage(sender ?? '', { text: `No photos found for folder ID: ${folderId}` });
+        } else {
+            await sock.sendMessage(sender ?? '', { text: `Claro! Aqui você tem as fotos. Espero que você goste deles. Não se esqueça de apoiar nosso trabalho.` });
+            for (const photo of photos) {
+                await sock.sendMessage(sender ?? '', { image: { url: photo } });
+            }
+        }
+    });
+
+    // Listen for other events (optional, customize as needed)
+    sock.ev.on('chats.update', (chats) => {
+        console.log('Chats updated:', chats);
+    });
+
+    sock.ev.on('contacts.upsert', (contacts) => {
+        console.log('Contacts updated:', contacts);
+    });
+
+    return sock;
+}
+
+// Run the connection
+connectToWhatsApp()
+    .then(() => console.log('WhatsApp bot is running!'))
+    .catch((err) => console.error('Failed to start bot:', err));

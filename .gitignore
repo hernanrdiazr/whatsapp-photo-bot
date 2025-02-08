@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Environment variables
+.env
+
+# Authentication and credentials
+auth_info_baileys/
+baileys_store.json
+google_drive_api_credentials.json
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db 
