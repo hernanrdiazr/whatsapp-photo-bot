@@ -5,91 +5,17 @@ import AWS from 'aws-sdk';
 import dotenv from 'dotenv';
 const { google } = require('googleapis');
 import express from 'express';
-import { MercadoPagoConfig, Payment } from 'mercadopago';
 // Load environment variables from .env file
 dotenv.config();
-
-// Initialize MercadoPago client
-const client = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN || '' });
-const payment = new Payment(client);
 
 const app = express();
 const port = 80;
 
-let sock: any;
-
-// Function to initialize WhatsApp connection
-async function initializeWhatsApp() {
-    try {
-        sock = await connectToWhatsApp();
-        console.log('WhatsApp connection initialized successfully');
-    } catch (error) {
-        console.error('Error connecting to WhatsApp:', error);
-        // Retry connection after a delay
-        setTimeout(initializeWhatsApp, 5000);
-    }
-}
-
-// Initialize WhatsApp connection
-initializeWhatsApp();
-
 // Webhook route for pix payment
 app.use(express.json());
 app.post('/', async (req: any, res: any) => {
-  // Immediately respond with 200 status
-  res.status(200).json({ status: 'success' });
-
-  // Process the webhook data asynchronously
-  const { action, data } = req.body;
-  
-  if (action === 'payment.updated' && data.id) {
-    try {
-      // Process payment asynchronously with folderKey and phoneNumber from data
-      processPayment(data.id );
-    } catch (error) {
-      console.error('Error scheduling payment processing:', error);
-    }
-  }
+  return res.status(200).json(req.body);
 });
-
-// Updated function to handle payment processing with direct data
-async function processPayment(paymentId: string) {
-  try {
-    // Fetch payment details just to verify status
-    const paymentInfo = await payment.get({ id: paymentId });
-    console.log("*******", paymentInfo)
-    const {folder_key: folderKey, wn: whatsappNumber} = paymentInfo.metadata;
-    
-    if (paymentInfo.status === 'approved') {
-      
-      // Get photos from S3
-      const photos = await getPhotosFromS3('your-bucket-name', folderKey);
-      
-      if (photos && photos.length > 0) {
-        await sock.sendMessage(whatsappNumber, { 
-          text: `Olá! Muito obrigado pelo seu pagamento. Aqui estão todas as suas fotos!` 
-        });
-        
-        for (const photoUrl of photos) {
-          await sock.sendMessage(whatsappNumber, { 
-            image: { url: photoUrl }
-          });
-        }
-        
-        await sock.sendMessage(whatsappNumber, { 
-          text: `Esperamos que você goste das fotos! Muito obrigado pela preferência.` 
-        });
-      }
-    }
-    else {
-      await sock.sendMessage(whatsappNumber, {
-        text: `Olá! Muito obrigado pelo seu pagamento. Infelizmente, o pagamento não foi aprovado.`
-      });
-    }
-  } catch (error) {
-    console.error('Error processing payment:', error);
-  }
-}
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
@@ -264,11 +190,22 @@ async function connectToWhatsApp() {
         const photos = await getPhotosFromS3('your-bucket-name', folderKey);
     
         if (photos.length === 0) {
-            await sock.sendMessage(sender ?? '', { text: `Desculpe, ocorreu um problema. Vamos verificar e entraremos em contato.` });
+            await sock.sendMessage(sender ?? '', { text: `No photos found for folder key: ${folderKey}` });
         } else {
-            await sock.sendMessage(sender ?? '', { text: `Claro! Aqui você tem uma foto de demonstração. Esperamos que você goste dela. Pode nos fazer uma contribucao atraves do seguinte link. Voce escolhe o valor a partir de 10 R$, o que voce acha que nos merecemos por nosso trabalho. Muito obrigado` });
-                await sock.sendMessage(sender ?? '', { image: { url: photos[0] }, viewOnce: true  });
-            await sock.sendMessage(sender ?? '', { text: `https://v0-new-project-3c6m53cpxsf-7n7eic.vercel.app/?folderKey=${folderKey}&wn=${sender}` });
+            await sock.sendMessage(sender ?? '', { text: `Claro! Aqui você tem as fotos. Esperamos que você goste delas. Não esqueça de apoiar nosso trabalho.` });
+            for (const photo of photos) {
+                await sock.sendMessage(sender ?? '', { image: { url: photo } });
+            }
+            await sock.sendMessage(sender ?? '', { text: `Um abraço para você. Não deixe de nos apoiar.` });
+            await sock.sendMessage(sender ?? '', { text: `Aqui nosso PIX. Você pode copiar e colar no seu aplicativo do banco. Você escolhe o valor. Muito obrigado` });
+
+            const chavePIX = 'df742aa0-39f3-49af-9f83-06c3d2d3d2cd'; // Substitua pela chave PIX
+            const identificador = folderKey; // Substitua pelo identificador
+            const valor = null; // Opcional, se não for informado, será 0.00
+            const payloadPIX = gerarPayloadPIX(chavePIX, identificador, valor);
+
+            // await sock.sendMessage(sender ?? '', { text: `00020126580014BR.GOV.BCB.PIX0136e7ea3b26-dd31-4c43-8ed7-6cd4f6c69abc5204000053039865802BR5921VICENTE ARDITO JUNIOR6009SAO PAULO62070503***63042A87` });
+            await sock.sendMessage(sender ?? '', { text: payloadPIX });
         }
     });
 
@@ -284,4 +221,7 @@ async function connectToWhatsApp() {
     return sock;
 }
 
-
+// Run the connection
+connectToWhatsApp()
+    .then(() => console.log('WhatsApp bot is running!'))
+    .catch((err) => console.error('Failed to start bot:', err));
