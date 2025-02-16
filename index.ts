@@ -57,7 +57,6 @@ async function processPayment(paymentId: string) {
   try {
     // Fetch payment details just to verify status
     const paymentInfo = await payment.get({ id: paymentId });
-    console.log("*******", paymentInfo)
     const {folder_key: folderKey, wn: whatsappNumber} = paymentInfo.metadata;
     
     if (paymentInfo.status === 'approved') {
@@ -67,7 +66,7 @@ async function processPayment(paymentId: string) {
       
       if (photos && photos.length > 0) {
         await sock.sendMessage(whatsappNumber, { 
-          text: `Olá! Muito obrigado pelo seu pagamento. Aqui estão todas as suas fotos!` 
+          text: `Olá! Muito obrigado pela sua contribuição. Aqui estão todas as suas fotos!` 
         });
         
         for (const photoUrl of photos) {
@@ -83,7 +82,7 @@ async function processPayment(paymentId: string) {
     }
     else {
       await sock.sendMessage(whatsappNumber, {
-        text: `Olá! Muito obrigado pelo seu pagamento. Infelizmente, o pagamento não foi aprovado.`
+        text: `Desculpe-nos, infelizmente, o pagamento não foi aprovado.`
       });
     }
   } catch (error) {
@@ -266,7 +265,7 @@ async function connectToWhatsApp() {
         if (photos.length === 0) {
             await sock.sendMessage(sender ?? '', { text: `Desculpe, ocorreu um problema. Vamos verificar e entraremos em contato.` });
         } else {
-            await sock.sendMessage(sender ?? '', { text: `Claro! Aqui você tem uma foto de demonstração. Esperamos que você goste dela. Pode nos fazer uma contribucao atraves do seguinte link. Voce escolhe o valor a partir de 10 R$, o que voce acha que nos merecemos por nosso trabalho. Muito obrigado` });
+            await sock.sendMessage(sender ?? '', { text: `Claro! Aqui você tem uma foto de demonstração. Esperamos que goste. Para receber todas as fotos, incluindo as originais e as processadas com o fundo trocado, clique no link abaixo e escolha um valor para contribuição.  O valor que você achar que merecemos pelo nosso trabalho. Muito obrigado!` });
                 await sock.sendMessage(sender ?? '', { image: { url: photos[0] }, viewOnce: true  });
             await sock.sendMessage(sender ?? '', { text: `https://v0-new-project-3c6m53cpxsf-7n7eic.vercel.app/?folderKey=${folderKey}&wn=${sender}` });
         }
