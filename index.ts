@@ -265,9 +265,9 @@ async function connectToWhatsApp() {
         if (photos.length === 0) {
             await sock.sendMessage(sender ?? '', { text: `Desculpe, ocorreu um problema. Vamos verificar e entraremos em contato.` });
         } else {
-            await sock.sendMessage(sender ?? '', { text: `Claro! Aqui você tem uma foto de demonstração. Esperamos que goste. Para receber todas as fotos, incluindo as originais e as processadas com o fundo trocado, clique no link abaixo e escolha um valor para contribuição.  O valor que você achar que merecemos pelo nosso trabalho. Muito obrigado!` });
+            await sock.sendMessage(sender ?? '', { text: `Claro! Aqui você tem uma foto de demonstração. Esperamos que goste. Para receber todas as fotos, incluindo as originais e as processadas com o fundo trocado, clique no link abaixo e escolha um valor para sua contribuição.  O valor que você achar que merecemos pelo nosso trabalho. Muito obrigado!` });
                 await sock.sendMessage(sender ?? '', { image: { url: photos[0] }, viewOnce: true  });
-            await sock.sendMessage(sender ?? '', { text: `https://v0-new-project-3c6m53cpxsf-7n7eic.vercel.app/?folderKey=${folderKey}&wn=${sender}` });
+            await sock.sendMessage(sender ?? '', { text: `https://v0-new-project-3c6m53cpxsf.vercel.app/?folderKey=${folderKey}&wn=${sender}` });
         }
     });
 
