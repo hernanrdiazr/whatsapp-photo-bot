@@ -52,6 +52,9 @@ app.post('/', async (req: any, res: any) => {
   }
 });
 
+// Add this helper function for delays
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Updated function to handle payment processing with direct data
 async function processPayment(paymentId: string) {
   try {
@@ -65,22 +68,25 @@ async function processPayment(paymentId: string) {
       const photos = await getPhotosFromS3('your-bucket-name', folderKey);
       
       if (photos && photos.length > 0) {
+        await delay(1500);
         await sock.sendMessage(whatsappNumber, { 
           text: `Olá! Muito obrigado pela sua contribuição. Aqui estão todas as suas fotos!` 
         });
-        
+        await delay(1500);
         for (const photoUrl of photos) {
           await sock.sendMessage(whatsappNumber, { 
             image: { url: photoUrl }
           });
         }
         
+        await delay(1500);
         await sock.sendMessage(whatsappNumber, { 
           text: `Esperamos que você goste das fotos! Muito obrigado pela preferência.` 
         });
       }
     }
     else {
+      await delay(1500);
       await sock.sendMessage(whatsappNumber, {
         text: `Desculpe-nos, infelizmente, o pagamento não foi aprovado.`
       });
