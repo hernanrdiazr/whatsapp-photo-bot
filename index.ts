@@ -56,39 +56,65 @@ app.post('/', async (req: any, res: any) => {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Updated function to handle payment processing with direct data
+// Add this helper function for retrying operations
+async function retryOperation(operation: () => Promise<any>, maxRetries = 3, delayMs = 2000) {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      if (i === maxRetries - 1) throw error;
+      if (error?.output?.statusCode === 408 || error?.output?.statusCode === 428) {
+        await delay(delayMs);
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
+// Update the processPayment function
 async function processPayment(paymentId: string) {
   try {
-    // Fetch payment details just to verify status
     const paymentInfo = await payment.get({ id: paymentId });
     const {folder_key: folderKey, wn: whatsappNumber} = paymentInfo.metadata;
     
     if (paymentInfo.status === 'approved') {
-      
-      // Get photos from S3
       const photos = await getPhotosFromS3('your-bucket-name', folderKey);
       
       if (photos && photos.length > 0) {
-        await delay(1500);
-        await sock.sendMessage(whatsappNumber, { 
-          text: `Olá! Muito obrigado pela sua contribuição. Aqui estão todas as suas fotos!` 
-        });
-        await delay(1500);
-        for (const photoUrl of photos) {
+        await delay(2000); // Initial longer delay
+
+        // Send welcome message with retry
+        await retryOperation(async () => {
           await sock.sendMessage(whatsappNumber, { 
-            image: { url: photoUrl }
+            text: `Olá! Muito obrigado pela sua contribuição. Aqui estão todas as suas fotos!` 
+          });
+        });
+
+        // Send photos with retry
+        for (const photoUrl of photos) {
+          await delay(2000);
+          await retryOperation(async () => {
+            await sock.sendMessage(whatsappNumber, { 
+              image: { url: photoUrl }
+            });
           });
         }
         
-        await delay(1500);
-        await sock.sendMessage(whatsappNumber, { 
-          text: `Esperamos que você goste das fotos! Muito obrigado pela preferência.` 
+        await delay(2000);
+        // Send thank you message with retry
+        await retryOperation(async () => {
+          await sock.sendMessage(whatsappNumber, { 
+            text: `Esperamos que você goste das fotos! Muito obrigado pela preferência.` 
+          });
         });
       }
-    }
-    else {
-      await delay(1500);
-      await sock.sendMessage(whatsappNumber, {
-        text: `Desculpe-nos, infelizmente, o pagamento não foi aprovado.`
+    } else {
+      await delay(2000);
+      await retryOperation(async () => {
+        await sock.sendMessage(whatsappNumber, {
+          text: `Desculpe-nos, infelizmente, o pagamento não foi aprovado.`
+        });
       });
     }
   } catch (error) {
